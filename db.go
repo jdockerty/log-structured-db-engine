@@ -101,11 +101,15 @@ func Set(db *os.File, hash *os.File, entry string) error {
 	if err != nil {
 		return err
 	}
+
+	// The actual implementation would likely write the data as binary, but to show the concept here we can
+	// use string so that we can see the entires plainly in the database file.
 	_, err = db.WriteString(entry + "\n")
 	if err != nil {
 		return err
 	}
 
+	// With the format of our entries, the ID is the 0th element using the comma seperator.
 	id := strings.Split(entry, ",")[0]
 
 	// Maintain hash index on writes, this is where a hash index trade-off occurs.
@@ -155,6 +159,8 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// In our toy example, this will basically always be the case, but serves
+	// as a general idea of how this might be implemented.
 	if info.Size() > 0 {
 		fmt.Println("Populating stored hash index")
 
@@ -166,6 +172,7 @@ func main() {
 		}
 	}
 
+	// Write an entry.
 	if *entry != "" {
 		if !strings.Contains(*entry, ",") {
 			log.Fatal("an entry should be in the format '<id>,<string>', e.g. '10,hello'")
@@ -177,6 +184,7 @@ func main() {
 		return
 	}
 
+	// Get an entry using its ID. We're assuming that the ID is a known quantity here.
 	if *getId != "" {
 		fmt.Printf("Getting record with ID: %s\n", *getId)
 
