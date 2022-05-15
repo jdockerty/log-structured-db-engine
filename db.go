@@ -22,8 +22,9 @@ const dbName = "log-structure.db"
 const indexName = "hash-index.db"
 
 var (
-	entry = flag.String("entry", "", "a string entry to insert, should be in the form '<id>,<string>'")
-	getId = flag.String("get", "", "the ID of the entry to retrieve from the database.")
+	entry        = flag.String("entry", "", "a string entry to insert, should be in the form '<id>,<string>'")
+	getId        = flag.String("get", "", "the ID of the entry to retrieve from the database.")
+	disableIndex = flag.Bool("disable-index", false, "disable the hash index for retrieving an entry, forcing a search through the entire database.")
 
 	// Our hash index is in the format { ID : byte_offset }
 	// This enables us to jump to the relevant section of the file if the ID we are looking for
@@ -43,6 +44,13 @@ func init() {
 func Get(db *os.File, id string) (string, error) {
 
 	r := bufio.NewScanner(db)
+	var entry string
+
+	// Jump straight into a full scan if the cache is disabled.
+	if *disableIndex {
+		fmt.Println("Indexing disabled, running full scan.")
+		return scanFullDB(r, id), nil
+	}
 
 	if offset, ok := hashIndex[id]; ok {
 
@@ -57,37 +65,41 @@ func Get(db *os.File, id string) (string, error) {
 		// this will be our record.
 		r.Scan()
 
-		// Return the text at the byte offset, this is our text
-		return r.Text(), nil
+		// Return the text found at the byte offset, this is our desired entry.
+		entry = r.Text()
+		return entry, nil
 	}
 
 	// If the ID is not in our index, we need to scan the all the entries and then pass the latest one.
 	// We cannot pass the first one, since there may be more up to date record in the file.
 	// For practically all cases, the index will be present since we hold it in memory and update it
 	// on each write. Although for full functionality, this is included to show that we would require a
-	// full scan first and then find the latest entry.
-	var find string
-	for r.Scan() {
+	// full scan to find the latest entry.
+	return scanFullDB(r, id), nil
+
+}
+
+func scanFullDB(sc *bufio.Scanner, id string) string {
+	var entry string
+	for sc.Scan() {
 
 		// Values are in format of "<id>,<string>"
-		dbId := strings.Split(r.Text(), ",")[0]
+		dbId := strings.Split(sc.Text(), ",")[0]
 
 		// Find all entries which match the ID, there may be multiple
 		// so we find them all and only want the latest entry, which is what we return.
 		// Note: This toy implementation does not include tombstone records for deletions.
 		if dbId == id {
-			find = r.Text()
+			entry = sc.Text()
 		}
 	}
 
-	if find == "" {
-		fmt.Printf("ID '%s' is not contained in the database.\n", id)
-		return find, nil
+	if entry == "" {
+		return entry
 	} else {
 		// Return the most recent entry
-		return find, nil
+		return entry
 	}
-
 }
 
 // Set will append an entry into the given file. This attempts to imitate the functionality of
@@ -188,11 +200,16 @@ func main() {
 	if *getId != "" {
 		fmt.Printf("Getting record with ID: %s\n", *getId)
 
-		gotRecord, err := Get(f, *getId)
+		entry, err := Get(f, *getId)
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Println("Record:", gotRecord)
+
+		if entry == "" {
+			fmt.Printf("ID '%s' is not contained in the database.\n", *getId)
+			return
+		}
+		fmt.Println("Record:", entry)
 		return
 
 	}
