@@ -1,0 +1,5 @@
+# Local build for testing purposes
+db
+
+# Local db files
+*.db
