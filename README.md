@@ -19,7 +19,7 @@ This is my own not-so-concise implementation in Go, used to solidify the concept
 
 ### Example
 
-Build using `go build db.go` and then run
+Build using `go build cmd/db.go` and then run
 
 ```bash
 ./db --entry "1, foo"
