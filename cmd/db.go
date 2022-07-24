@@ -74,12 +74,14 @@ func main() {
 		}
 	}
 
+	db := logstructured.DB{DB: f, HashStorage: hashFile, Hash: hashIndex, HashDisabled: *disableIndex}
+
 	// Write an entry.
 	if *entry != "" {
 		if !strings.Contains(*entry, ",") {
 			log.Fatal("an entry should be in the format '<id>,<string>', e.g. '10,hello'")
 		}
-		err := logstructured.Set(hashIndex, f, hashFile, *entry)
+		err := logstructured.Set(&db, *entry)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -90,7 +92,7 @@ func main() {
 	if *getId != "" {
 		fmt.Printf("Getting record with ID: %s\n", *getId)
 
-		entry, err := logstructured.Get(hashIndex, disableIndex, f, *getId)
+		entry, err := logstructured.Get(&db, *getId)
 		if err != nil {
 			log.Fatal(err)
 		}

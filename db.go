@@ -7,29 +7,40 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 )
+
+type DB struct {
+	DB           *os.File         // Database file written to disk
+	Hash         map[string]int64 // Hash index for fast lookups to the byte offset of the string value.
+	HashDisabled bool             // Force a full scan, no use of the Hash index
+	HashStorage  *os.File         // Hash index file, this is written to disk for persistence and durability between crashes etc. It can simply be loaded again on startup.
+	sync.Mutex                    // Simple lock for writes to ensure safer concurrency.
+}
 
 // Get retrieves the entry with the given id from the file. This is intended to imitate the functionality of
 // db_get() {
 //     grep "^$1," database | sed -e "s/^$1,//" | tail -n 1
 // }
 // which is demonstrated in the book.
-func Get(hashIndex map[string]int64, disableIndex *bool, db *os.File, id string) (string, error) {
+func Get(db *DB, id string) (string, error) {
 
-	r := bufio.NewScanner(db)
+	// No locks are required here since we are reading from a file, this is safe.
+
+	r := bufio.NewScanner(db.DB)
 	var entry string
 
 	// Jump straight into a full scan if the cache is disabled.
-	if *disableIndex {
+	if db.HashDisabled {
 		fmt.Println("Indexing disabled, running full scan.")
 		return scanFullDB(r, id), nil
 	}
 
-	if offset, ok := hashIndex[id]; ok {
+	if offset, ok := db.Hash[id]; ok {
 
 		// Seek to our byte offset provided by the hash index, this means we only scan the entry from here
 		// as opposed to the entire file.
-		_, err := db.Seek(offset, io.SeekStart)
+		_, err := db.DB.Seek(offset, io.SeekStart)
 		if err != nil {
 			return "", err
 		}
@@ -80,16 +91,16 @@ func scanFullDB(sc *bufio.Scanner, id string) string {
 //     echo "$1,$2" >> database
 // }
 // from the simplified database in the book.
-func Set(hashIndex map[string]int64, db *os.File, hash *os.File, entry string) error {
+func Set(db *DB, entry string) error {
 
-	info, err := db.Stat()
+	info, err := db.DB.Stat()
 	if err != nil {
 		return err
 	}
 
 	// The actual implementation would likely write the data as binary, but to show the concept here we can
 	// use string so that we can see the entires plainly in the database file.
-	_, err = db.WriteString(entry + "\n")
+	_, err = db.DB.WriteString(entry + "\n")
 	if err != nil {
 		return err
 	}
@@ -101,15 +112,18 @@ func Set(hashIndex map[string]int64, db *os.File, hash *os.File, entry string) e
 	// We need to maintain the offsets on writes, but it vastly speeds up reads.
 	// This likely isn't a fully realistic imitation, since we're not doing any
 	// compaction or segmenting of files, but the general concept is there.
-	hashIndex[id] = info.Size()
+	db.Hash[id] = info.Size()
 
 	// Seek to the beginning of the file, we can overwrite our map, rather than appending to make it simpler.
 	// We only maintain a single mapping value, rather than multiple and being required to read the latest entry.
-	hash.Seek(0, io.SeekStart)
+	_, err = db.HashStorage.Seek(0, io.SeekStart)
+	if err != nil {
+		return err
+	}
 
 	// Update our hash index on subsequent data entries
-	g := json.NewEncoder(hash)
-	err = g.Encode(hashIndex)
+	g := json.NewEncoder(db.HashStorage)
+	err = g.Encode(db.Hash)
 	if err != nil {
 		return err
 	}
