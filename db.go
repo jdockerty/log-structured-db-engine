@@ -116,7 +116,10 @@ func Set(db *DB, entry string) error {
 
 	// Seek to the beginning of the file, we can overwrite our map, rather than appending to make it simpler.
 	// We only maintain a single mapping value, rather than multiple and being required to read the latest entry.
-	db.HashStorage.Seek(0, io.SeekStart)
+	_, err = db.HashStorage.Seek(0, io.SeekStart)
+	if err != nil {
+		return err
+	}
 
 	// Update our hash index on subsequent data entries
 	g := json.NewEncoder(db.HashStorage)
