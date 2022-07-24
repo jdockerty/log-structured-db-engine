@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	entry        = flag.String("entry", "", "a string entry to insert, should be in the form '<id>,<string>'")
+	set          = flag.String("set", "", "a string entry to insert, should be in the form '<id>,<string>'")
 	getId        = flag.String("get", "", "the ID of the entry to retrieve from the database.")
 	disableIndex = flag.Bool("disable-index", false, "disable the hash index for retrieving an entry, forcing a search through the entire database.")
 
@@ -77,11 +77,11 @@ func main() {
 	db := logstructured.DB{DB: f, HashStorage: hashFile, Hash: hashIndex, HashDisabled: *disableIndex}
 
 	// Write an entry.
-	if *entry != "" {
-		if !strings.Contains(*entry, ",") {
+	if *set != "" {
+		if !strings.Contains(*set, ",") {
 			log.Fatal("an entry should be in the format '<id>,<string>', e.g. '10,hello'")
 		}
-		err := logstructured.Set(&db, *entry)
+		err := logstructured.Set(&db, *set)
 		if err != nil {
 			log.Fatal(err)
 		}

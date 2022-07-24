@@ -22,10 +22,10 @@ This is my own not-so-concise implementation in Go, used to solidify the concept
 Build using `go build cmd/db.go` and then run
 
 ```bash
-./db --entry "1, foo"
-./db --entry "2, bar"
+./db --set "1, foo"
+./db --set "2, bar"
 ./db --get "1" # outputs 'foo'
-./db --entry "1, bar" # updates ID 1 to bar
+./db --set "1, bar" # updates ID 1 to bar
 ./db --get "1" # outputs 'bar'
-./db --disable-index --get "1" # also outputs 'bar', but with a full scan returning the latest entry
+./db --disable-index --get "1" # also outputs 'bar', but with a full scan returning the latest record
 ```
